@@ -131,8 +131,9 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
                 item['sentfrom']['party'] = party_el.get('FormalName', '')
 
                 element = party_el.find('Property')
-                if element.attrib.get('FormalName', '') == 'Organization':
-                    item['sentfrom']['organization'] = element.attrib['Value']
+                if element is not None:
+                    if element.attrib.get('FormalName', '') == 'Organization':
+                        item['sentfrom']['organization'] = element.attrib['Value']
 
         return item
 
@@ -335,6 +336,12 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         if component_el.attrib.get('Duid', '') != '':
             item['news_component_duid'] = component_el.attrib.get('Duid', '')
 
+        if component_el.attrib.get('EquivalentsList', '') != '':
+            item['news_component_essential'] = component_el.attrib.get('Essential', '')
+
+        if component_el.attrib.get('EquivalentsList', '') != '':
+            item['news_component_equivalentslist'] = component_el.attrib.get('EquivalentsList', '')
+
         role = component_el.find('Role')
         if role is not None:
             if role.attrib.get('FormalName', ''):
@@ -441,9 +448,16 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         """
         if descript_el is None:
             return
+
         element = descript_el.find('Language')
         if element is not None:
             item['language'] = element.text
+
+        elements = descript_el.findall('Genre')
+        if elements is not None:
+            item['genre'] = []
+            for element in elements:
+                item['genre'].append({'name': element.get('FormalName')})
 
         # parser SubjectCode element
         subjects = descript_el.findall('SubjectCode/SubjectDetail')
@@ -538,17 +552,27 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         """
         if content_el is None:
             return
+
         element = content_el.find('MediaType')
         if element is not None:
             item['media_type'] = element.get('FormalName', '')
+
         element = content_el.find('Format')
         if element is not None:
             item['format'] = element.get('FormalName', '')
-        content_el.find('DataContent/nitf/body/body.content')
 
-        item['body_html'] = etree.tostring(
-            content_el.find('DataContent/nitf/body/body.content'),
-            encoding='unicode').replace('<body.content>', '').replace('</body.content>', '')
+        element = content_el.find('Characteristics')
+        if element is not None:
+            item['characteristics'] = {}
+            elements = element.findall('Property')
+            for element in elements:
+                if element.attrib.get('FormalName', '') is not None:
+                    item['characteristics'][element.attrib.get('FormalName', '')] = element.attrib['Value']
+
+        if content_el.find('DataContent/nitf/body/body.content') is not None:
+            item['body_html'] = etree.tostring(content_el.find('DataContent/nitf/body/body.content'),
+                                               encoding='unicode').replace('<body.content>', '').replace(
+                '</body.content>', '')
 
         if content_el.find('DataContent/nitf/head') is not None:
             item['header_content'] = etree.tostring(content_el.find('DataContent/nitf/head'), encoding='unicode')
