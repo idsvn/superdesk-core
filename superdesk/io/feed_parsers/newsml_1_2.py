@@ -180,8 +180,10 @@ class NewsMLOneFeedParser(XMLFeedParser):
 
         for subject in subjects:
             formal_name = subject.get('FormalName')
+            scheme = subject.get('Scheme', '')
             if formal_name and is_not_formatted(formal_name):
-                formatted_subjects.append({'qcode': formal_name, 'name': subject_codes.get(formal_name, '')})
+                formatted_subjects.append(
+                    {'qcode': formal_name, 'name': subject_codes.get(formal_name, ''), 'scheme': scheme})
 
         return formatted_subjects
 

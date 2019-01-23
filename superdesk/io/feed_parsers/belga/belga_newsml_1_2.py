@@ -10,10 +10,10 @@
 
 import datetime
 
-from superdesk.io.feed_parsers.newsml_1_2 import NewsMLOneFeedParser
-from superdesk.io.registry import register_feed_parser
 from superdesk.errors import ParserError
 from superdesk.etree import etree
+from superdesk.io.feed_parsers.newsml_1_2 import NewsMLOneFeedParser
+from superdesk.io.registry import register_feed_parser
 
 
 class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
@@ -116,6 +116,24 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         element = envelop_el.find('Priority')
         if element is not None:
             item['priority'] = element.get('FormalName', 0)
+
+        # EFE
+        sentfrom_el = envelop_el.find('SentFrom')
+        if sentfrom_el is not None:
+            comment_el = sentfrom_el.find('Comment')
+            item['sentfrom'] = {}
+
+            if comment_el is not None:
+                item['sentfrom']['comment'] = comment_el.text
+
+            party_el = sentfrom_el.find('Party')
+            if party_el is not None:
+                item['sentfrom']['party'] = party_el.get('FormalName', '')
+
+                element = party_el.find('Property')
+                if element.attrib.get('FormalName', '') == 'Organization':
+                    item['sentfrom']['organization'] = element.attrib['Value']
+
         return item
 
     def parser_newsitem(self, item, newsitem_el):
@@ -141,6 +159,17 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         :param newsitem_el:
         :return:
         """
+
+        if newsitem_el.attrib.get('Duid', '') != '':
+            item['duid'] = newsitem_el.attrib.get('Duid', '')
+
+        element = newsitem_el.find('Comment')
+        if element is not None:
+            item['comment'] = {}
+
+            item['comment']['version'] = element.text
+            if element.get('FormalName', '') is not None:
+                item['comment']['name'] = element.get('FormalName', '')
 
         # Parser Identification element
         self.parser_identification(item, newsitem_el.find('Identification'))
@@ -169,8 +198,10 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
           <NameLabel>musique-rock-célébrités-religion-France</NameLabel>
         </Identification>
         """
+
         if indent_el is None:
             return
+
         newsident_el = indent_el.find('NewsIdentifier')
         if newsident_el is not None:
             element = newsident_el.find('ProviderId')
@@ -193,9 +224,15 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
             if element is not None:
                 item['guid'] = element.text
 
-        element = newsident_el.find('NameLabel')
+        element = indent_el.find('NameLabel')
         if element is not None:
             item['label'] = element.text
+
+        # ANP
+        element = indent_el.find('DateLabel')
+        if element is not None:
+            item['date_label'] = element.text
+
         return
 
     def parser_newsmanagement(self, item, manage_el):
@@ -224,6 +261,7 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
 
         if manage_el is None:
             return
+
         element = manage_el.find('NewsItemType')
         if element is not None:
             item['item_type'] = element.get('FormalName', '')
@@ -290,8 +328,18 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         :param component_el:
         :return:
         """
+
         if component_el is None:
             return
+
+        if component_el.attrib.get('Duid', '') != '':
+            item['news_component_duid'] = component_el.attrib.get('Duid', '')
+
+        role = component_el.find('Role')
+        if role is not None:
+            if role.attrib.get('FormalName', ''):
+                item['role'] = role.attrib.get('FormalName', '')
+
         newsline_el = component_el.find('NewsLines')
         if newsline_el is not None:
             element = newsline_el.find('DateLine')
@@ -310,11 +358,47 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
             if element is not None:
                 item['line_text'] = element.text
 
+            # ANP
+            element = newsline_el.find('NewsLine/SubHeadLine')
+            if element is not None:
+                item['sub_head_line'] = element.text
+
+            element = newsline_el.find('NewsLine/ByLine')
+            if element is not None:
+                item['by_line'] = element.text
+
+            element = newsline_el.find('NewsLine/ByLineTitle')
+            if element is not None:
+                item['by_line_title'] = element.text
+
+            element = newsline_el.find('NewsLine/DateLine')
+            if element is not None:
+                item['date_line'] = element.text
+
+            element = newsline_el.find('NewsLine/CopyrightLine')
+            if element is not None:
+                item['copyright_line'] = element.text
+
+            element = newsline_el.find('NewsLine/SlugLine')
+            if element is not None:
+                item['slug_line'] = element.textelement = newsline_el.find('NewsLine/SlugLine')
+
+            element = newsline_el.find('NewsLine/KeywordLine')
+            if element is not None:
+                item['keyword_line'] = element.text
+            # ANP
+
         admin_el = component_el.find('AdministrativeMetadata')
         if admin_el is not None:
+            item['administrative'] = {}
+
             element = admin_el.find('Provider/Party')
             if element is not None:
-                item['provide_id'] = element.get('FormalName', '')
+                item['administrative']['provider'] = element.get('FormalName', '')
+
+            element = admin_el.find('Creator/Party')
+            if element is not None:
+                item['administrative']['creator'] = element.get('FormalName', '')
 
         # parser DescriptiveMetadata element
         self.parser_descriptivemetadata(item, component_el.find('DescriptiveMetadata'))
@@ -385,6 +469,11 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         location_el = descript_el.find('Location')
         if location_el is not None:
             item['location'] = {}
+
+            how_present_el = location_el.get('HowPresent', '')
+            if how_present_el is not None:
+                item['location']['how_present_el'] = how_present_el
+
             elements = location_el.findall('Property')
             for element in elements:
                 if element.attrib.get('FormalName', '') == 'Country':
@@ -393,10 +482,22 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
                     item['location']['city'] = element.attrib['Value']
 
         elements = descript_el.findall('Property')
-
         for element in elements:
             if element.attrib.get('FormalName', '') == 'GeneratorSoftware':
                 item['generator_software'] = element.attrib['FormalName']
+
+            if element.attrib.get('FormalName', '') == 'Tesauro':
+                item['tesauro'] = element.attrib['Value']
+
+            if element.attrib.get('FormalName', '') == 'EfePais':
+                item['efe_pais'] = element.attrib['Value']
+
+            if element.attrib.get('FormalName', '') == 'EfeRegional':
+                item['efe_regional'] = element.attrib['Value']
+
+            if element.attrib.get('FormalName', '') == 'EfeComplemento':
+                item['efe_complemento'] = element.attrib['Value']
+
             if element.attrib.get('FormalName', '') == 'Keyword':
                 data = element.attrib['Value']
                 if 'keyworks' in item:
@@ -443,10 +544,17 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         element = content_el.find('Format')
         if element is not None:
             item['format'] = element.get('FormalName', '')
+        content_el.find('DataContent/nitf/body/body.content')
 
         item['body_html'] = etree.tostring(
             content_el.find('DataContent/nitf/body/body.content'),
             encoding='unicode').replace('<body.content>', '').replace('</body.content>', '')
+
+        if content_el.find('DataContent/nitf/head') is not None:
+            item['header_content'] = etree.tostring(content_el.find('DataContent/nitf/head'), encoding='unicode')
+
+        if content_el.find('DataContent/nitf/body/body.head') is not None:
+            item['body_head'] = etree.tostring(content_el.find('DataContent/nitf/body/body.head'), encoding='unicode')
 
 
 register_feed_parser(BelgaNewsMLOneFeedParser.NAME, BelgaNewsMLOneFeedParser())
