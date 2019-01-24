@@ -191,7 +191,7 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
 
             element = newsident_el.find('PublicIdentifier')
             if element is not None:
-                item['guid'] = element.text
+                    item['guid'] = element.text
 
         element = newsident_el.find('NameLabel')
         if element is not None:
@@ -360,7 +360,7 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
             return
         element = descript_el.find('Language')
         if element is not None:
-            item['language'] = element.text
+            item['language'] = element.get('FormalName', '')
 
         # parser SubjectCode element
         subjects = descript_el.findall('SubjectCode/SubjectDetail')
@@ -397,13 +397,13 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
 
         for element in elements:
             if element.attrib.get('FormalName', '') == 'GeneratorSoftware':
-                item['generator_software'] = element.attrib['FormalName']
+                item['generator_software'] = element.attrib['Value']
             if element.attrib.get('FormalName', '') == 'Keyword':
                 data = element.attrib['Value']
-                if 'keyworks' in item:
-                    item['keyworks'].append(data)
+                if 'keywords' in item:
+                    item['keywords'].append(data)
                 else:
-                    item['keyworks'] = [data]
+                    item['keywords'] = [data]
 
     def parser_contentitem(self, item, content_el):
         """
@@ -439,12 +439,21 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
 
         if content_el is None:
             return
+
         element = content_el.find('MediaType')
         if element is not None:
             item['media_type'] = element.get('FormalName', '')
+
         element = content_el.find('Format')
         if element is not None:
             item['format'] = element.get('FormalName', '')
+
+        character_el = content_el.find('Characteristics')
+        if character_el is not None:
+            item['size_bytes'] = character_el.find('SizeInBytes').text
+            element = character_el.find('Property')
+            if element is not None and element.attrib.get('FormalName') == 'Words':
+                item['word_count'] = element.attrib['Value']
 
         item['body_html'] = etree.tostring(
             content_el.find('DataContent/nitf/body/body.content'),
