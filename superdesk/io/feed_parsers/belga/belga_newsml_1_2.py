@@ -20,6 +20,7 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
     """
     Feed Parser which can parse if the feed is in NewsML format, specific AFP, ANP, .. Belga xml.
     """
+
     NAME = 'belganewsml12'
 
     label = 'Belga News ML 1.2 Parser'
@@ -69,7 +70,7 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
             # parser the NewsItem element
             l_newsitem_el = xml.findall('NewsItem')
             for newsitem_el in l_newsitem_el:
-                item = item_envelop
+                item = item_envelop.copy()
                 self.parser_newsitem(item, newsitem_el)
                 l_item.append(self.populate_fields(item))
             return l_item
@@ -78,7 +79,6 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
             raise ParserError.BelganewsmlOneParserError(ex, provider)
 
     def parser_newsenvelop(self, envelop_el):
-
         """
         Function parser Identification element
 
@@ -96,6 +96,7 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         :param envelop_el:
         :return:
         """
+
         if envelop_el is None:
             return {}
         item = {}
@@ -138,7 +139,6 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         return item
 
     def parser_newsitem(self, item, newsitem_el):
-
         """
         Function parser Newsitem element
 
@@ -201,9 +201,8 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
                 self.parser_newscomponent(item, component_parent)
 
     def parser_identification(self, item, indent_el):
-
         """
-        function parse Identification in NewsItem element
+        Function parse Identification in NewsItem element
 
         Example:
 
@@ -242,7 +241,7 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
 
             element = newsident_el.find('PublicIdentifier')
             if element is not None:
-                item['guid'] = element.text
+                    item['guid'] = element.text
 
         element = indent_el.find('NameLabel')
         if element is not None:
@@ -256,7 +255,6 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         return
 
     def parser_newsmanagement(self, item, manage_el):
-
         """
         Function parser NewsManagement in NewsItem element
 
@@ -478,12 +476,13 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         :param descript_el:
         :return:
         """
+
         if descript_el is None:
             return
 
         element = descript_el.find('Language')
         if element is not None:
-            item['language'] = element.text
+            item['language'] = element.get('FormalName', '')
 
         elements = descript_el.findall('Genre')
         if elements is not None:
@@ -537,7 +536,7 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         elements = descript_el.findall('Property')
         for element in elements:
             if element.attrib.get('FormalName', '') == 'GeneratorSoftware':
-                item['generator_software'] = element.attrib['FormalName']
+                item['generator_software'] = element.attrib['Value']
 
             if element.attrib.get('FormalName', '') == 'Tesauro':
                 item['tesauro'] = element.attrib['Value']
@@ -553,10 +552,10 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
 
             if element.attrib.get('FormalName', '') == 'Keyword':
                 data = element.attrib['Value']
-                if 'keyworks' in item:
-                    item['keyworks'].append(data)
+                if 'keywords' in item:
+                    item['keywords'].append(data)
                 else:
-                    item['keyworks'] = [data]
+                    item['keywords'] = [data]
 
     def parser_contentitem(self, item, content_el):
         """
@@ -589,6 +588,7 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         :param content_el:
         :return:
         """
+
         if content_el is None:
             return
 
@@ -607,10 +607,19 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         element = content_el.find('Characteristics')
         if element is not None:
             item['characteristics'] = {}
+            element = character_el.find('SizeInBytes')
+            if element is not None:
+                item['characteristics']['size_bytes'] = element.text
             elements = element.findall('Property')
             for element in elements:
-                if element.attrib.get('FormalName', '') is not None:
-                    item['characteristics'][element.attrib.get('FormalName', '')] = element.attrib['Value']
+                if element.attrib.get('FormalName') == 'Words':
+                    item['characteristics']['word_count'] = element.attrib['Value']
+                if element.attrib.get('FormalName') == 'SizeInBytes':
+                    item['characteristics']['size_bytes'] = element.attrib['Value']
+                if element.attrib.get('FormalName') == 'Creator':
+                    item['characteristics']['creator'] = element.attrib['Value']
+                if element.attrib.get('FormalName') == 'Characters':
+                    item['characteristics']['characters'] = element.attrib['Value']                    
 
         if content_el.find('DataContent/nitf/body/body.content') is not None:
             item['body_html'] = etree.tostring(content_el.find('DataContent/nitf/body/body.content'),

@@ -15,7 +15,7 @@ import requests
 from calendar import timegm
 from collections import namedtuple
 from datetime import datetime
-
+from superdesk.io.registry import registered_feed_parsers
 from superdesk.errors import IngestApiError, ParserError
 from superdesk.io.registry import register_feeding_service
 from superdesk.io.feeding_services import FeedingService
@@ -25,7 +25,6 @@ from superdesk.metadata.utils import generate_guid, generate_tag, generate_tag_f
 from superdesk.io.commands.update_ingest import LAST_ITEM_UPDATE
 
 from urllib.parse import quote as urlquote, urlsplit, urlunsplit
-
 
 utcfromtimestamp = datetime.utcfromtimestamp
 
@@ -175,7 +174,14 @@ class RSSFeedingService(FeedingService):
         xml_data = self._fetch_data(config, provider)
 
         try:
-            data = feedparser.parse(xml_data)
+            #  check registered parser if not rss style, run default rss
+            registered_parser = registered_feed_parsers.get(provider.get('feed_parser', ''))
+            if registered_parser:
+                parser = self.get_feed_parser(provider, xml_data)
+                data = parser.parse(xml_data, provider)
+
+            else:
+                data = feedparser.parse(xml_data)
         except Exception as ex:
             raise ParserError.parseMessageError(ex, provider, data=xml_data)
 
@@ -188,11 +194,11 @@ class RSSFeedingService(FeedingService):
 
         new_items = []
         field_aliases = config.get('field_aliases')
-
+        from datetime import timedelta, timezone, datetime
         for entry in data.entries:
             try:
                 t_entry_updated = utcfromtimestamp(timegm(entry.updated_parsed))
-                if t_entry_updated <= t_provider_updated:
+                if t_entry_updated + timedelta(days=365) <= t_provider_updated:
                     continue
             except (AttributeError, TypeError):
                 # missing updated info, so better ingest it
@@ -341,9 +347,9 @@ class RSSFeedingService(FeedingService):
             # found in its default data field and is not aliased, try to
             # populate it using the aforementioned content field as a fallback.
             if (
-                field.name == 'body_html' and
-                not field_value and
-                field.name_in_data not in field_aliases
+                                field.name == 'body_html' and
+                            not field_value and
+                            field.name_in_data not in field_aliases
             ):
                 try:
                     item['body_html'] = data.content[0].value
@@ -368,6 +374,34 @@ class RSSFeedingService(FeedingService):
             'date': item.get('firstcreated', item.get('versioncreated'))
         }
 
+        # get Belga anp atom data
+        provider_id = data.get('anp_provider', None)
+        if provider_id == 'ANP':
+            item['provider_id'] = provider_id
+            item['char_count'] = data.get('anp_charcount')
+            item['localion'] = {
+                'city': data.get('anp_city'),
+                'country': data.get('anp_country')
+            }
+            item['codes'] = data.get('anp_codes')
+            item['copyright'] = data.get('anp_copyright')
+            item['financial'] = data.get('anp_financial')
+            item['keywords'] = [data.get('anp_keywords')]
+            item['language'] = data.get('anp_lang')
+            item['priority'] = data.get('anp_priority')
+            item['updated_date'] = data.get('anp_updated')
+            item['version'] = data.get('anp_version')
+            item['word_count'] = data.get('anp_wordcount')
+            author_name = data.get('author')
+            if author_name:
+                author = {
+                    'uri': None,
+                    'parent': None,
+                    'name': author_name,
+                    'role': None,
+                    'jobtitle': None,
+                }
+                item['authors'] = [author]
         return item
 
     def _create_image_items(self, image_links, text_item):
