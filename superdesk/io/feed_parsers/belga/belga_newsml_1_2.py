@@ -164,6 +164,9 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         if newsitem_el.attrib.get('Duid', '') != '':
             item['duid'] = newsitem_el.attrib.get('Duid', '')
 
+        if newsitem_el.attrib.get('LinkType', '') != '':
+            item['link_type'] = newsitem_el.attrib.get('LinkType', '')
+
         element = newsitem_el.find('Comment')
         if element is not None:
             item['comment'] = {}
@@ -179,7 +182,23 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         self.parser_newsmanagement(item, newsitem_el.find('NewsManagement'))
 
         # Parser NewsComponent element
-        self.parser_newscomponent(item, newsitem_el.find('NewsComponent'))
+        component_parent = newsitem_el.find('NewsComponent')
+        # if have a child NewsComponent, run the parser for TASS xml file.
+        if component_parent is not None:
+            if component_parent.attrib.get('Duid', '') is not None:
+                item['news_component_duid'] = component_parent.attrib.get('Duid', '')
+
+            if component_parent.attrib.get('Essential', '') is not None:
+                item['news_component_essential'] = component_parent.attrib.get('Essential', '')
+
+            if component_parent.attrib.get('EquivalentsList', '') is not None:
+                item['news_component_equivalentslist'] = component_parent.attrib.get('EquivalentsList', '')
+
+            component_child = component_parent.find('NewsComponent')
+            if component_child is not None:
+                self.parser_newscomponent(item, component_child.find('NewsComponent'))
+            else:
+                self.parser_newscomponent(item, component_parent)
 
     def parser_identification(self, item, indent_el):
 
@@ -333,13 +352,13 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         if component_el is None:
             return
 
-        if component_el.attrib.get('Duid', '') != '':
+        if component_el.attrib.get('Duid', '') is not None:
             item['news_component_duid'] = component_el.attrib.get('Duid', '')
 
-        if component_el.attrib.get('EquivalentsList', '') != '':
+        if component_el.attrib.get('Essential', '') is not None:
             item['news_component_essential'] = component_el.attrib.get('Essential', '')
 
-        if component_el.attrib.get('EquivalentsList', '') != '':
+        if component_el.attrib.get('EquivalentsList', '') is not None:
             item['news_component_equivalentslist'] = component_el.attrib.get('EquivalentsList', '')
 
         role = component_el.find('Role')
@@ -408,10 +427,23 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
                 item['administrative']['creator'] = element.get('FormalName', '')
 
         # parser DescriptiveMetadata element
-        self.parser_descriptivemetadata(item, component_el.find('DescriptiveMetadata'))
+        if component_el.find('DescriptiveMetadata') is not None:
+            self.parser_descriptivemetadata(item, component_el.find('DescriptiveMetadata'))
+        else:
+            self.parser_descriptivemetadata(item, component_el.find('DescriptiveMetada'))
 
         # parser ContentItem element
         self.parser_contentitem(item, component_el.find('ContentItem'))
+
+        # parser OfInterestTo element
+        keywords = component_el.find('item_keywords')
+        if keywords is not None:
+            elements = keywords.findall('item_keyword')
+
+            if elements is not None:
+                item['item_keywords'] = []
+                for element in elements:
+                    item['item_keywords'].append(element.text)
 
     def parser_descriptivemetadata(self, item, descript_el):
         """
@@ -458,6 +490,13 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
             item['genre'] = []
             for element in elements:
                 item['genre'].append({'name': element.get('FormalName')})
+
+        element = descript_el.find('guid')
+        if element is not None:
+            if 'guid' not in item:
+                item['guid'] = element.text
+            else:
+                item['descriptive_guid'] = element.text
 
         # parser SubjectCode element
         subjects = descript_el.findall('SubjectCode/SubjectDetail')
@@ -556,6 +595,10 @@ class BelgaNewsMLOneFeedParser(NewsMLOneFeedParser):
         element = content_el.find('MediaType')
         if element is not None:
             item['media_type'] = element.get('FormalName', '')
+
+        element = content_el.find('MimeType')
+        if element is not None:
+            item['mime_type'] = element.get('FormalName', '')
 
         element = content_el.find('Format')
         if element is not None:

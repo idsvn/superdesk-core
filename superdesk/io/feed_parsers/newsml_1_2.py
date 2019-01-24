@@ -126,10 +126,19 @@ class NewsMLOneFeedParser(XMLFeedParser):
         return attributes
 
     def datetime(self, string):
-        try:
+        if self.is_valid_datetime(string, '%Y%m%dT%H%M%S%z'):
             return datetime.datetime.strptime(string, '%Y%m%dT%H%M%S%z')
-        except ValueError:
+        if self.is_valid_datetime(string, '%Y%m%dT%H%M%S'):
+            return datetime.datetime.strptime(string, '%Y%m%dT%H%M%S')
+        if self.is_valid_datetime(string, '%Y%m%dT%H%M%SZ'):
             return datetime.datetime.strptime(string, '%Y%m%dT%H%M%SZ').replace(tzinfo=utc)
+
+    def is_valid_datetime(self, string, format_datetime):
+        try:
+            datetime.datetime.strptime(string, format_datetime)
+        except ValueError:
+            return False
+        return True
 
     def populate_fields(self, item):
         item[ITEM_TYPE] = CONTENT_TYPE.TEXT
