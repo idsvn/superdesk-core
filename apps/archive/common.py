@@ -18,6 +18,7 @@ from flask import current_app as app
 from eve.versioning import insert_versioning_documents
 from pytz import timezone
 from copy import deepcopy
+from dateutil.parser import parse
 
 import superdesk
 from superdesk import editor_utils
@@ -89,34 +90,6 @@ ARCHIVE_SCHEMA_FIELDS = {
         'type': 'string',
         'allowed': item_operations,
         'index': 'not_analyzed'
-    },
-    'target_regions': {
-        'type': 'list',
-        'nullable': True,
-        'schema': {
-            'type': 'dict',
-            'schema': {
-                'qcode': {'type': 'string'},
-                'name': {'type': 'string'},
-                'allow': {'type': 'boolean'}
-            }
-        }
-    },
-    'target_types': {
-        'type': 'list',
-        'nullable': True,
-        'schema': {
-            'type': 'dict',
-            'schema': {
-                'qcode': {'type': 'string'},
-                'name': {'type': 'string'},
-                'allow': {'type': 'boolean'}
-            }
-        }
-    },
-    'target_subscribers': {
-        'type': 'list',
-        'nullable': True
     },
     'event_id': {
         'type': 'string',
@@ -669,6 +642,12 @@ def update_schedule_settings(updates, field_name, value):
     :param field_name: Name of he field: either publish_schedule or embargo
     :param value: The original value
     """
+
+    if isinstance(value, str):
+        try:
+            value = parse(value)
+        except ValueError:
+            raise SuperdeskApiError.badRequestError(_("{} date is not recognized".format(field_name)))
 
     schedule_settings = updates.get(SCHEDULE_SETTINGS, {}) or {}
     utc_field_name = 'utc_{}'.format(field_name)

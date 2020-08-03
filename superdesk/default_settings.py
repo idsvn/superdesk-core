@@ -766,6 +766,13 @@ VALIDATOR_MEDIA_METADATA = {
     },
 }
 
+#: Allows you to disable validation on publish using these,
+#: but they will still be checked by client on upload.
+#:
+#: .. versionadded:: 1.34
+#:
+VALIDATE_MEDIA_METADATA_ON_PUBLISH = True
+
 #: Behaviour on missing vocabulary, only used in (STT)NewsML G2 for now
 #: if "reject", missing vocabulary are rejected
 #: if "create", a new vocabulary is created
@@ -873,3 +880,9 @@ USER_EXTERNAL_CREATE = False
 #: .. versionadded:: 2.0
 #:
 USER_EXTERNAL_DESK = None
+
+#: Set regex pattern to check username for
+#:
+#: .. versionadded:: 2.0
+#:
+USER_USERNAME_PATTERN = None
