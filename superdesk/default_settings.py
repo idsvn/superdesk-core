@@ -184,6 +184,9 @@ ELASTICSEARCH_SETTINGS = {
     }
 }
 
+# https://www.elastic.co/guide/en/elasticsearch/reference/master/search-request-body.html#request-body-search-track-total-hits # NOQA
+ELASTICSEARCH_TRACK_TOTAL_HITS = True
+
 #: redis url
 REDIS_URL = env('REDIS_URL', 'redis://localhost:6379')
 if env('REDIS_PORT'):
@@ -399,6 +402,7 @@ else:
     CORE_APPS.append('superdesk.users')
     CORE_APPS.append('apps.auth.db')
     CORE_APPS.append('apps.auth.xmpp')
+    CORE_APPS.append('apps.auth.oidc')
 
 
 CORE_APPS.extend([
@@ -886,3 +890,13 @@ USER_EXTERNAL_DESK = None
 #: .. versionadded:: 2.0
 #:
 USER_USERNAME_PATTERN = None
+
+
+#: OIDC config
+#:
+OIDC_ENABLED = strtobool(env('OIDC_ENABLED', 'false'))
+OIDC_ISSUER = env('OIDC_ISSUER', 'http://localhost:8080/auth/realms/SUPERDESK_REALM')
+OIDC_SERVER_CLIENT = env('OIDC_SERVER_CLIENT')
+OIDC_SERVER_CLIENT_SECRET = env('OIDC_SERVER_CLIENT_SECRET')
+OIDC_WEB_CLIENT = env('OIDC_WEB_CLIENT')
+OIDC_BROWSER_REDIRECT_URI = env('OIDC_BROWSER_REDIRECT_URI', 'http://localhost:9000')
