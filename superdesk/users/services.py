@@ -24,6 +24,8 @@ from superdesk.privilege import get_privilege_list
 from superdesk.errors import SuperdeskApiError
 from superdesk.users.errors import UserInactiveError, UserNotRegisteredException
 from superdesk.notification import push_notification
+from superdesk.validation import ValidationError
+from superdesk.utils import ignorecase_query
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +133,8 @@ def get_sign_off(user):
 
 
 class UsersService(BaseService):
+
+    _updating_stage_visibility = True
 
     def __is_invalid_operation(self, user, updates, method):
         """Checks if the requested 'PATCH' or 'DELETE' operation is Invalid.
@@ -277,9 +281,9 @@ class UsersService(BaseService):
         """
         Overriding the method to prevent from hard delete
         """
-
         user = super().find_one(req=None, _id=str(lookup['_id']))
-        return super().update(id=lookup['_id'], updates={'is_enabled': False, 'is_active': False}, original=user)
+        return super().update(id=ObjectId(lookup['_id']),
+                              updates={'is_enabled': False, 'is_active': False}, original=user)
 
     def __clear_locked_items(self, user_id):
         archive_service = get_resource_service('archive')
@@ -391,6 +395,8 @@ class UsersService(BaseService):
         return user
 
     def update_stage_visibility_for_users(self):
+        if not self._updating_stage_visibility:
+            return
         logger.info('Updating Stage Visibility Started')
         users = list(get_resource_service('users').get(req=None, lookup=None))
         for user in users:
@@ -399,6 +405,8 @@ class UsersService(BaseService):
         logger.info('Updating Stage Visibility Completed')
 
     def update_stage_visibility_for_user(self, user):
+        if not self._updating_stage_visibility:
+            return
         try:
             logger.info('Updating Stage Visibility for user {}.'.format(user.get(config.ID_FIELD)))
             stages = self.get_invisible_stages_ids(user.get(config.ID_FIELD))
@@ -408,6 +416,14 @@ class UsersService(BaseService):
         except Exception:
             logger.exception('Failed to update the stage visibility '
                              'for user: {}'.format(user.get(config.ID_FIELD)))
+
+    def stop_updating_stage_visibility(self):
+        if not app.config.get('SUPERDESK_TESTING'):
+            raise RuntimeError('Only allowed during testing')
+        self._updating_stage_visibility = False
+
+    def start_updating_stage_visibility(self):
+        self._updating_stage_visibility = True
 
 
 class DBUsersService(UsersService):
@@ -476,3 +492,38 @@ class DBUsersService(UsersService):
 
         super().on_deleted(doc)
         get_resource_service('reset_user_password').remove_all_tokens_for_email(doc.get('email'))
+
+    def _process_external_data(self, _data, update=False):
+        data = _data.copy()
+        if data.get('role'):
+            role_name = data.pop('role')
+            role = get_resource_service('roles').find_one(req=None, name=ignorecase_query(role_name))
+            if role:
+                data['role'] = role['_id']
+        if data.get('desk') or app.config.get('USER_EXTERNAL_DESK'):
+            desk_name = data.pop('desk', None) or app.config.get('USER_EXTERNAL_DESK')
+            desk = get_resource_service('desks').find_one(req=None, name=ignorecase_query(desk_name))
+            if desk:
+                data['desk'] = desk['_id']
+        data['needs_activation'] = False
+        if update:
+            data.pop('email')
+            data.pop('username')
+        validator = self._validator()
+        if not validator.validate(data, update=update):
+            raise ValidationError(validator.errors)
+        return validator.normalized(data) if not update else data
+
+    def create_external_user(self, data):
+        docs = [self._process_external_data(data)]
+        self.on_create(docs)
+        self.create(docs)
+        for user in docs:
+            if user.get('desk'):
+                get_resource_service('desks').add_member(user['desk'], user['_id'])
+        return docs[0]
+
+    def update_external_user(self, _id, data):
+        orig = self.find_one(req=None, _id=ObjectId(_id))
+        updates = self._process_external_data(data, update=True)
+        self.system_update(ObjectId(_id), updates, orig)
