@@ -894,7 +894,7 @@ USER_USERNAME_PATTERN = None
 
 #: OIDC config
 #:
-OIDC_ENABLE = strtobool(env('OIDC_ENABLE', 'false'))
+OIDC_ENABLED = strtobool(env('OIDC_ENABLED', 'false'))
 OIDC_ISSUER = env('OIDC_ISSUER', 'http://localhost:8080/auth/realms/SUPERDESK_REALM')
 OIDC_SERVER_CLIENT = env('OIDC_SERVER_CLIENT')
 OIDC_SERVER_CLIENT_SECRET = env('OIDC_SERVER_CLIENT_SECRET')
